@@ -801,7 +801,7 @@ pub fn init(cx: &mut App) {
                                     path: file_path.clone(),
                                 };
 
-                                let Some((repo, repo_path)) = project
+                                let Some((_repo, repo_path)) = project
                                     .read(cx)
                                     .git_store()
                                     .read(cx)
@@ -2158,11 +2158,19 @@ impl Render for GitGraph {
             }
         };
 
+        let error = self.get_selected_repository(cx).and_then(|repo| {
+            repo.read(cx)
+                .get_graph_data(self.log_source.clone(), self.log_order)
+                .and_then(|data| data.error.clone())
+        });
+
         let content = if commit_count == 0 {
-            let message = if is_loading {
-                "Loading"
+            let message = if let Some(error) = &error {
+                format!("Error loading: {}", error)
+            } else if is_loading {
+                "Loading".to_string()
             } else {
-                "No commits found"
+                "No commits found".to_string()
             };
             let label = Label::new(message)
                 .color(Color::Muted)
@@ -2174,7 +2182,7 @@ impl Render for GitGraph {
                 .items_center()
                 .justify_center()
                 .child(label)
-                .when(is_loading, |this| {
+                .when(is_loading && error.is_none(), |this| {
                     this.child(self.render_loading_spinner(cx))
                 })
         } else {
